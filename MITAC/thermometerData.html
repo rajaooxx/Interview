@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
+
+
+	<title>Thermometer</title>
+
+
+	<script src="./js/jquery-3.3.1.min.js"></script>
+	<script src="./js/vue-2.5.16.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.2/Chart.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.22.2/moment.min.js"></script>
+
+
+	<style type="text/css">
+		#devInfo, #dataChart{
+			margin: auto;
+			margin-bottom: 40px;
+		}
+		#devInfo th, #devInfo td{
+			padding: 2px 6px;
+			text-align: center;
+		}
+		@media screen and (max-width: 1000px){
+			#dataChart{
+				width: 90%;
+				height: auto;
+			}	
+		}
+	</style>
+
+
+</head>
+<body>
+	<!-- Device information area -->
+    <table id="devInfo" border="1" cellspacing="0">
+    	<caption>Device Information</caption>
+    	<thead>
+    		<tr>
+    			<th colspan="2">id</th>
+    			<th colspan="2">name</th>
+    		</tr>
+    	</thead>
+    	<tbody>
+    		<tr>
+    			<td colspan="2">{{devId}}</td>
+    			<td colspan="2">{{devName}}</td>
+			</tr>
+    	</tbody>
+    	<thead>
+    		<tr>
+    			<th>data</th>
+    			<th>networkId</th>
+    			<th>deviceTypeId</th>
+    			<th>isBlocked</th>
+    		</tr>
+    	</thead>
+    	<tbody>
+			<tr>
+    			<td>{{devData}}</td>
+    			<td>{{devNetworkId}}</td>
+    			<td>{{devDeviceTypeId}}</td>
+    			<td>{{devIsBlocked}}</td>
+    		</tr>
+    	</tbody>
+    </table>
+	<!-- Device information end -->
+
+	<!-- Data Chart area -->
+	<canvas id="dataChart" width="900" height="600">
+		If you see this sentence, should go to get the Chrome browser.
+	</canvas>
+	<!-- Data Chart end -->
+
+	<!-- js for plot chart -->
+	<script src="./js/dataToChart.js"></script>
+
+	<!-- js for get data -->
+    <script type="text/javascript">
+    	var storage = sessionStorage;
+    	console.log('accessToken: ' + storage.accessToken);
+    	console.log('refreshToken: ' + storage.refreshToken);
+
+		// Create device information instance
+		var devInfo = new Vue({
+			el: '#devInfo',
+			data: {
+				devId: 'id',
+				devName: 'name',
+				devData: 'data',
+				devNetworkId: 'networkId',
+				devDeviceTypeId: 'deviceTypeId',
+				devIsBlocked: 'isBlocked',
+			}
+		});
+
+		//refreshToken
+		reGetToken();
+		setInterval(reGetToken, 1500000);
+		
+		getDevInfo(); //get device information
+		
+		getData(); //get sensor data
+
+		function reGetToken(){
+			var refreshData = new Object();
+			refreshData.refreshToken = storage.refreshToken;
+
+			//Send refresh msg
+			$.ajax({
+			  type: "POST",
+			  beforeSend: function(xhr) {
+				xhr.setRequestHeader('content-type','application/json');
+				xhr.setRequestHeader('Accept','application/json');
+				xhr.setRequestHeader(
+					'Authorization','Bearer ' + storage.accessToken
+				);
+			  },
+			  url: "http://test.comismart.com/auth/rest/token/refresh",
+			  data: JSON.stringify(refreshData),
+			  success: function(msg) {
+			  	console.log('refreshToken');
+			    console.log(msg);
+
+			    storage.accessToken = msg.accessToken;
+			  },
+			  error: function(xhr,exception){
+			  	if(xhr.status == "401"){
+			  		console.log('401 reGetToken');
+			  		reGetToken();
+			  	}
+			  }
+			});
+		};
+
+		function getDevInfo(){
+			//Send required for device information
+			$.ajax({
+			  type: "GET",
+			  async: false,
+			  beforeSend: function(xhr) {
+				xhr.setRequestHeader('content-type','application/json');
+				xhr.setRequestHeader('Accept','application/json');
+				xhr.setRequestHeader(
+					'Authorization','Bearer ' +
+					storage.accessToken
+				);
+			  },
+			  url: "http://test.comismart.com:80/api/rest/device/e50d6085-2aba-48e9-b1c3-73c673e414be",
+			  // data: JSON.stringify(refreshData),
+			  success: function(msg) {
+			  	console.log('getDevInfo');
+			    console.log(msg);
+
+			    devInfo.devId = msg.id;
+			    devInfo.devName = msg.name;
+			    devInfo.devData = msg.data;
+			    devInfo.devNetworkId = msg.networkId;
+			    devInfo.devDeviceTypeId = msg.deviceTypeId;
+			    devInfo.devIsBlocked = msg.isBlocked;
+				
+				
+			  }
+			});	
+		};
+		function getData(){
+			var ws = new WebSocket('ws://test.comismart.com/api/websocket');
+
+			ws.onopen = function() {
+		       	console.log('websocket success connect!');
+			    //送出Authenticate命令
+		       	var actAuthenticate = new Object();
+			    actAuthenticate.action = "authenticate";
+			    actAuthenticate.token = storage.accessToken;
+
+			    console.log("actAuthenticate:");
+			    console.log(actAuthenticate);
+			    ws.send(JSON.stringify(actAuthenticate));
+
+			    //送出Notification命令
+			    var actNotification = new Object();
+			    actNotification.action = "notification/subscribe";
+			    actNotification.deviceId = devInfo.devId;
+			    actNotification.names = new Array();
+			    actNotification.names[0] = "measurement";
+
+			    console.log("actNotification:");
+			    console.log(actNotification);
+			    ws.send(JSON.stringify(actNotification));
+	      	};
+		    ws.onclose = function() {
+	       		console.log('websocket disconnect!');
+		    };
+		    ws.onmessage = function(event) {
+		    	console.log('websocket onmessage!');
+		    	console.log(event.data);
+
+		    	let data = JSON.parse(event.data);
+		    	// $('#dataResult').text(event.data);
+
+		    	if( data.action === 'notification/insert'){
+		    		//getData and add to chart 
+		    		dataToChart(data);   //function in dataToChart.js
+		    	}	    	
+	  		};		
+		}		
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="">
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
+
+
+	<title>login</title>
+
+
+	<script src="./js/jquery-3.3.1.min.js"></script>
+	<script src="./js/vue-2.5.16.min.js"></script>
+
+
+	<style type="text/css">
+		#password{
+			margin-bottom: 20px;
+		}
+	</style>
+
+
+</head>
+<body>
+	<!-- User Input Area -->
+	<form id="userInput">
+		<p>Username:</p>
+		<input type="text" v-model="login" @keyup.enter="userSubmit">
+		<p>Password:</p>
+		<input type="password" v-model="password" @keyup.enter="userSubmit" id="password"> </br>
+		<button type="button" @click="userSubmit">submit</button>
+	</form>
+	<!-- User Input End -->
+
+	<script type="text/javascript">
+		var storage = sessionStorage;
+
+		//Create Vue instance for login and password
+		var userInput = new Vue({
+			el: '#userInput',
+			data: {
+				login: '',
+				password: '',
+			},
+			methods: {
+				userSubmit: function(){
+					if(this.login !== 'test'){
+						alert('Username error');
+						return;
+					}
+					if(this.password !== '123456'){
+						alert('Password error');
+						return;
+					}
+
+					//Get token
+					getToken();					
+					//Go to next page
+					window.location = "thermometerData.html";
+				}
+			},
+		});
+
+		function getToken(){
+			//Prepare user input data
+			var loginInfo = new Object();
+			loginInfo.login = window.userInput.login;
+			loginInfo.password = window.userInput.password;
+
+			console.log(loginInfo);
+		
+			$.ajax({
+			  type: "POST",
+			  async: false,	//Wait to get token finished
+			  beforeSend: function(xhr) {
+				xhr.setRequestHeader('content-type','application/json');
+				xhr.setRequestHeader('Accept','application/json');
+			  },
+			  url: "http://test.comismart.com/auth/rest/token",
+			  data: JSON.stringify(loginInfo),
+			  success: function(msg) {
+			  	console.log('accessToken');
+			    console.log(msg);
+			    
+			    //Record token to sessionStorage
+			    storage.accessToken = msg.accessToken;
+			    storage.refreshToken = msg.refreshToken;
+			  }
+			});
+		}
+
+		
+
+
+	</script>
+</body>
+</html>	
